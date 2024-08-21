@@ -1,7 +1,11 @@
 package ru.netology.nmedia.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.*
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.map
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 import ru.netology.nmedia.db.AppDb
 import ru.netology.nmedia.dto.Post
@@ -93,10 +97,10 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 var like = post.likedByMe
-                if(!like) {
-                    repository.likeById(post.id) // идём в class PostRepositoryImpl в функцию likeById(id) и сохраняем изменение лайка поста на сервере и базе
-                } else{
-                    repository.dislikeById(post.id)
+                if (!like) {
+                    repository.likeById(post.id, false) // идём в class PostRepositoryImpl в функцию likeById(id) и сохраняем изменение лайка поста на сервере и базе
+                } else {
+                    repository.likeById(post.id, true)
                 }
             } catch (e: Exception) {
                 _dataState.value = FeedModelState(error = true)

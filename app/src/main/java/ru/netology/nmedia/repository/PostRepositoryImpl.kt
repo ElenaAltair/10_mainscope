@@ -2,6 +2,7 @@ package ru.netology.nmedia.repository
 
 import androidx.lifecycle.*
 import okio.IOException
+import retrofit2.Response
 import ru.netology.nmedia.api.*
 import ru.netology.nmedia.dao.PostDao
 import ru.netology.nmedia.dto.Post
@@ -14,7 +15,8 @@ import ru.netology.nmedia.error.UnknownError
 
 class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
     // функция getAll() возвращает подписку на посты LiveData<List<PostEntity>>
-    override val data = dao.getAll().map(List<PostEntity>::toDto) // преобразуем List<PostEntity> в List<Post>
+    override val data =
+        dao.getAll().map(List<PostEntity>::toDto) // преобразуем List<PostEntity> в List<Post>
 
     override suspend fun getAll() {
         try {
@@ -73,21 +75,23 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
         }
     }
 
-    override suspend fun likeById(id: Long) {
+    override suspend fun likeById(id: Long, like: Boolean) {
+        var postFindByIdOld = dao.findById(id)
         try {
             // сохраняем пост в базе данных
-            var postFindByIdOld = dao.findById(id)
-            val postFindById = postFindByIdOld
-            val postFindByIdNew = postFindById.copy(
-                likedByMe = !postFindById.likedByMe,
-                likes = postFindById.likes + if(postFindById.likedByMe) - 1 else 1
+            val postFindByIdNew = postFindByIdOld.copy(
+                likedByMe = !postFindByIdOld.likedByMe,
+                likes = postFindByIdOld.likes + if (postFindByIdOld.likedByMe) -1 else 1
             )
             dao.insert(postFindByIdNew)
 
             // делаем запрос на изменение лайка поста на сервере
-            val response = PostsApi.service.likeById(id)
+            val response: Response<Post> = if (!like) {
+                PostsApi.service.likeById(id)
+            } else {
+                PostsApi.service.dislikeById(id)
+            }
             if (!response.isSuccessful) { // если запрос прошёл неуспешно, выбросить исключение
-                dao.insert(postFindByIdOld)
                 throw ApiError(response.code(), response.message())
             }
 
@@ -96,38 +100,11 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             // сохраняем пост в базе данных
             dao.insert(PostEntity.fromDto(body)) // PostEntity.fromDto(body) - преобразуем Post в PostEntity
         } catch (e: IOException) {
+            dao.insert(postFindByIdOld) // вернём базу данных к исходному виду
             throw NetworkError
         } catch (e: Exception) {
             throw UnknownError
         }
     }
 
-    override suspend fun dislikeById(id: Long) {
-        try {
-            // сохраняем пост в базе данных
-            var postFindByIdOld = dao.findById(id)
-            val postFindById = postFindByIdOld
-            val postFindByIdNew = postFindById.copy(
-                likedByMe = !postFindById.likedByMe,
-                likes = postFindById.likes + if(postFindById.likedByMe) - 1 else 1
-            )
-            dao.insert(postFindByIdNew)
-
-            // делаем запрос на изменение лайка поста на сервере
-            val response = PostsApi.service.dislikeById(id)
-            if (!response.isSuccessful) { // если запрос прошёл неуспешно, выбросить исключение
-                dao.insert(postFindByIdOld)
-                throw ApiError(response.code(), response.message())
-            }
-
-            // в качетве тела запроса нам возвращается Post
-            val body = response.body() ?: throw ApiError(response.code(), response.message())
-            // сохраняем пост в базе данных
-            dao.insert(PostEntity.fromDto(body)) // PostEntity.fromDto(body) - преобразуем Post в PostEntity
-        } catch (e: IOException) {
-            throw NetworkError
-        } catch (e: Exception) {
-            throw UnknownError
-        }
-    }
 }
