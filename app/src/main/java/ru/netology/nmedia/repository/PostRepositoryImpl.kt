@@ -75,7 +75,7 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
         }
     }
 
-    override suspend fun likeById(id: Long, like: Boolean) {
+    override suspend fun likeById(id: Long) {
         var postFindByIdOld = dao.findById(id)
         try {
             // сохраняем пост в базе данных
@@ -86,12 +86,13 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             dao.insert(postFindByIdNew)
 
             // делаем запрос на изменение лайка поста на сервере
-            val response: Response<Post> = if (!like) {
+            val response: Response<Post> = if (!postFindByIdOld.likedByMe) {
                 PostsApi.service.likeById(id)
             } else {
                 PostsApi.service.dislikeById(id)
             }
             if (!response.isSuccessful) { // если запрос прошёл неуспешно, выбросить исключение
+                dao.insert(postFindByIdOld) // вернём базу данных к исходному виду
                 throw ApiError(response.code(), response.message())
             }
 
@@ -103,6 +104,7 @@ class PostRepositoryImpl(private val dao: PostDao) : PostRepository {
             dao.insert(postFindByIdOld) // вернём базу данных к исходному виду
             throw NetworkError
         } catch (e: Exception) {
+            dao.insert(postFindByIdOld) // вернём базу данных к исходному виду
             throw UnknownError
         }
     }

@@ -96,12 +96,7 @@ class PostViewModel(application: Application) : AndroidViewModel(application) {
     fun likeById(post: Post) {
         viewModelScope.launch {
             try {
-                var like = post.likedByMe
-                if (!like) {
-                    repository.likeById(post.id, false) // идём в class PostRepositoryImpl в функцию likeById(id) и сохраняем изменение лайка поста на сервере и базе
-                } else {
-                    repository.likeById(post.id, true)
-                }
+                repository.likeById(post.id) // идём в class PostRepositoryImpl в функцию likeById(id) и сохраняем изменение лайка поста на сервере и базе
             } catch (e: Exception) {
                 _dataState.value = FeedModelState(error = true)
             }
